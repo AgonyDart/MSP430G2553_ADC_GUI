@@ -1,7 +1,18 @@
 import threading
+import shutil
+import os
+import serial
+from datetime import datetime
 import tkinter as tk
 import modules.live_data as live_data
-import modules.data_gen as data_gen
+import modules.msp430 as msp430
+
+# import modules.data_gen as data_gen
+
+ser = serial.Serial("COM3")
+ser.baudrate = 9600
+ser.timeout = 1
+flag = threading.Event()
 
 
 def init_root():
@@ -25,9 +36,16 @@ def init_root():
     root.resizable(False, False)
     MainApplication(root)
 
-    flag = threading.Event()
-    data_gen_thread = threading.Thread(target=data_gen.generate_data, args=(flag,))
-    data_gen_thread.start()
+    mps430_thread = threading.Thread(
+        target=msp430.init_serial_com,
+        args=(
+            ser,
+            flag,
+        ),
+    )
+    mps430_thread.start()
+    # data_gen_thread = threading.Thread(target=data_gen.generate_data, args=(flag,))
+    # data_gen_thread.start()
 
     root.mainloop()
 
@@ -44,13 +62,17 @@ class MainApplication(tk.Frame):
 
         # <Buttons Logic>
         def change_channel():
-            pass
+            msp430.button(ser)
 
         def save():
-            pass
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            new_filename = f"./data/data_{timestamp}.csv"
+            print(f"File saved as: {new_filename}")
+            shutil.copy2("./data/data.csv", new_filename)
+            print(f"File copied to: {new_filename}")
 
         def clear():
-            pass
+            live_data.clear_data(self)
 
         def create_button(
             parent,
@@ -74,13 +96,15 @@ class MainApplication(tk.Frame):
                 justify=justify,
                 relief=relief,
             )
-            button.pack()
+            button.pack(side="left", padx=10, pady=10)
             return button
 
         # <create the rest of your GUI here>
 
         btn_change_channel = create_button(
-            self.parent, "Change Channel", change_channel
+            self.parent,
+            "Change Channel",
+            change_channel,
         )
         btn_save = create_button(self.parent, "Save", save)
         btn_clear = create_button(self.parent, "Clear", clear, bg="#BD598F")
